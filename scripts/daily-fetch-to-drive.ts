@@ -74,7 +74,13 @@ async function fetchPreviousDayRows(): Promise<CompanyDirectorRow[]> {
           console.warn(`[daily-fetch] API ${status} at start_index=${startIndex}, retry in ${wait}ms…`);
           await new Promise((r) => setTimeout(r, wait));
         } else {
-          throw e;
+          const label = status ?? "unknown";
+          console.warn(
+            `[daily-fetch] Giving up on Companies House advanced-search page at start_index=${startIndex} (status ${label}). ` +
+              "Continuing with companies fetched so far."
+          );
+          res = { items: [], total_results: totalResults, page_number: 0, items_per_page: 0 };
+          break;
         }
       }
     }
