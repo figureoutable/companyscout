@@ -33,6 +33,7 @@ export default function HomeClient() {
   const [rows, setRows] = useState<CompanyDirectorRow[]>([]);
   const [totalResults, setTotalResults] = useState<number>(0);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
   /** Search tab only — do not block Enrich when a search is running in the background. */
   const [searchBusy, setSearchBusy] = useState(false);
   /** Enrich tab only — do not block Search while enriching. */
@@ -65,6 +66,7 @@ export default function HomeClient() {
     setProgress({ phase: "companies", current: 0, total: 1 });
     setRows([]);
     setResultMessage(null);
+    setInlineError(null);
     setSelectedIndices(new Set());
 
     pollRef.current = setInterval(() => {
@@ -88,8 +90,10 @@ export default function HomeClient() {
       setRows(result.rows);
       setTotalResults(result.totalResults);
       setResultMessage(result.message ?? null);
+      setInlineError(null);
       toast.success(`Found ${result.rows.length} company-director row(s) from ${result.totalResults} companies.`);
     } else {
+      setInlineError(result.error);
       toast.error(result.error);
     }
   }, [filters]);
@@ -101,6 +105,7 @@ export default function HomeClient() {
     setProgress({ phase: "directors", current: 0, total: Math.max(1, numbers.length), description: "Starting…" });
     setRows([]);
     setResultMessage(null);
+    setInlineError(null);
     setSelectedIndices(new Set());
 
     pollRef.current = setInterval(() => {
@@ -124,6 +129,7 @@ export default function HomeClient() {
       stopPolling();
       setEnrichBusy(false);
       const msg = e instanceof Error ? e.message : "Network or server error.";
+      setInlineError(`Enrichment failed: ${msg}`);
       toast.error(`Enrichment failed: ${msg}`);
       return;
     }
@@ -134,6 +140,7 @@ export default function HomeClient() {
       setRows(result.rows);
       setTotalResults(new Set(result.rows.map((r) => r.company_number)).size);
       setResultMessage(result.message ?? null);
+      setInlineError(null);
       if (result.rows.length === 0) {
         toast.warning(result.message ?? "No rows could be enriched.");
       } else if (result.message) {
@@ -142,6 +149,7 @@ export default function HomeClient() {
         toast.success(`Enriched ${result.rows.length} row(s) from uploaded numbers.`);
       }
     } else {
+      setInlineError(result.error);
       toast.error(result.error);
     }
   }, []);
@@ -277,6 +285,12 @@ export default function HomeClient() {
                     mainTab === "search" && "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
                   )}
                 >
+                  {inlineError && (
+                    <div className="shrink-0 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                      {inlineError}
+                    </div>
+                  )}
+
                   {!tabBusy && rows.length > 0 && (
                     <div className="shrink-0 space-y-1 rounded-lg border border-border/60 bg-muted/20 px-4 py-3 dark:bg-muted/10">
                       <p className="text-sm text-muted-foreground">
