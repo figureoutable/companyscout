@@ -25,6 +25,13 @@ const DEFAULT_FILTERS: SearchFiltersType = {
 
 const POLL_INTERVAL_MS = 400;
 
+/** Companies per server action — keeps each request under Vercel serverless timeouts (Hobby ~10s). */
+const parsedEnrichChunk = Number(process.env.NEXT_PUBLIC_ENRICH_CHUNK_SIZE);
+const ENRICH_CHUNK_SIZE =
+  Number.isFinite(parsedEnrichChunk) && parsedEnrichChunk > 0
+    ? Math.floor(parsedEnrichChunk)
+    : 12;
+
 type MainTab = "search" | "enrich";
 
 export default function HomeClient() {
@@ -108,49 +115,105 @@ export default function HomeClient() {
     setInlineError(null);
     setSelectedIndices(new Set());
 
-    pollRef.current = setInterval(() => {
-      void (async () => {
-        const p = await getEnrichProgress(sessionId);
-        if (p) {
-          setProgress({
-            phase: "directors",
-            current: p.current,
-            total: p.total,
-            description: `Enriching company ${p.current} of ${p.total}…`,
-          });
-        }
-      })();
-    }, POLL_INTERVAL_MS);
+    const chunks: string[][] = [];
+    for (let i = 0; i < numbers.length; i += ENRICH_CHUNK_SIZE) {
+      chunks.push(numbers.slice(i, i + ENRICH_CHUNK_SIZE));
+    }
+    const useChunked = chunks.length > 1;
 
-    let result: Awaited<ReturnType<typeof enrichCompanyNumbers>>;
-    try {
-      result = await enrichCompanyNumbers(numbers, sessionId);
-    } catch (e) {
+    if (!useChunked) {
+      pollRef.current = setInterval(() => {
+        void (async () => {
+          const p = await getEnrichProgress(sessionId);
+          if (p) {
+            setProgress({
+              phase: "directors",
+              current: p.current,
+              total: p.total,
+              description: `Enriching company ${p.current} of ${p.total}…`,
+            });
+          }
+        })();
+      }, POLL_INTERVAL_MS);
+    }
+
+    const finishWithError = (msg: string) => {
       stopPolling();
       setEnrichBusy(false);
-      const msg = e instanceof Error ? e.message : "Network or server error.";
-      setInlineError(`Enrichment failed: ${msg}`);
+      const hint =
+        /unexpected response/i.test(msg) || /failed to fetch/i.test(msg)
+          ? " Long runs often hit Vercel’s server time limit; we split large lists into smaller server requests—if this persists, lower NEXT_PUBLIC_ENRICH_CHUNK_SIZE (e.g. 8) in Vercel env."
+          : "";
+      setInlineError(`Enrichment failed: ${msg}${hint}`);
       toast.error(`Enrichment failed: ${msg}`);
-      return;
-    }
-    stopPolling();
-    setEnrichBusy(false);
+    };
 
-    if (result.success) {
-      setRows(result.rows);
-      setTotalResults(new Set(result.rows.map((r) => r.company_number)).size);
-      setResultMessage(result.message ?? null);
-      setInlineError(null);
-      if (result.rows.length === 0) {
-        toast.warning(result.message ?? "No rows could be enriched.");
-      } else if (result.message) {
-        toast.success(`Enriched ${result.rows.length} row(s).`, { description: result.message });
-      } else {
-        toast.success(`Enriched ${result.rows.length} row(s) from uploaded numbers.`);
+    try {
+      if (!useChunked) {
+        const result = await enrichCompanyNumbers(numbers, sessionId);
+        stopPolling();
+        setEnrichBusy(false);
+        if (result.success) {
+          setRows(result.rows);
+          setTotalResults(new Set(result.rows.map((r) => r.company_number)).size);
+          setResultMessage(result.message ?? null);
+          setInlineError(null);
+          if (result.rows.length === 0) {
+            toast.warning(result.message ?? "No rows could be enriched.");
+          } else if (result.message) {
+            toast.success(`Enriched ${result.rows.length} row(s).`, { description: result.message });
+          } else {
+            toast.success(`Enriched ${result.rows.length} row(s) from uploaded numbers.`);
+          }
+        } else {
+          setEnrichBusy(false);
+          setInlineError(result.error);
+          toast.error(result.error);
+        }
+        return;
       }
-    } else {
-      setInlineError(result.error);
-      toast.error(result.error);
+
+      const allRows: CompanyDirectorRow[] = [];
+      const batchMessages: string[] = [];
+      let processed = 0;
+
+      for (let c = 0; c < chunks.length; c++) {
+        const chunk = chunks[c];
+        const chunkSessionId = `${sessionId}-b${c}`;
+        setProgress({
+          phase: "directors",
+          current: processed,
+          total: numbers.length,
+          description: `Batch ${c + 1} of ${chunks.length} (${chunk.length} companies)…`,
+        });
+
+        const result = await enrichCompanyNumbers(chunk, chunkSessionId);
+        if (!result.success) {
+          finishWithError(result.error);
+          return;
+        }
+        allRows.push(...result.rows);
+        if (result.message) batchMessages.push(result.message);
+        processed += chunk.length;
+      }
+
+      stopPolling();
+      setEnrichBusy(false);
+      const combinedMessage = batchMessages.length > 0 ? batchMessages.join(" ") : null;
+      setRows(allRows);
+      setTotalResults(new Set(allRows.map((r) => r.company_number)).size);
+      setResultMessage(combinedMessage);
+      setInlineError(null);
+      if (allRows.length === 0) {
+        toast.warning(combinedMessage ?? "No rows could be enriched.");
+      } else if (combinedMessage) {
+        toast.success(`Enriched ${allRows.length} row(s).`, { description: combinedMessage });
+      } else {
+        toast.success(`Enriched ${allRows.length} row(s) from uploaded numbers.`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Network or server error.";
+      finishWithError(msg);
     }
   }, []);
 
