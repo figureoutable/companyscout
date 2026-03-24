@@ -5,16 +5,23 @@ A Next.js web application that queries the **Companies House public API** to fin
 ## Features
 
 - **Search** by **how many** most recently incorporated companies you want (newest first), plus SIC codes, company type, and registered address keyword
+- **Enrich from file** tab: drop a CSV/TXT of company numbers → fetches company name, registered address, directors and director addresses from Companies House (cap per run via `ENRICH_MAX_COMPANIES`, default 500). The results table also shows **whether annual accounts are overdue**, **next accounts due date**, **whether the confirmation statement is overdue**, and **next confirmation due date** (from the company profile).
 - **Results table** with company details and director names, occupations, nationalities
-- **Export** selected rows or all results to CSV (`companies_house_YYYY-MM-DD.csv`)
+- **Export** to CSV — full column set including derived outreach fields; **Enrich** tab’s table also shows those derived columns plus accounts/confirmation overdue (**Search** table omits those extra columns for a simpler view)
 - **Rate limiting**: configurable delay between officer lookups, exponential backoff on 429, live progress (“Fetching directors: X of Y companies”)
 - **Dark mode** and responsive layout
 
 ## Tech Stack
 
-- Next.js 14 (App Router)
-- Kokonut UI / shadcn/ui, Tailwind CSS
+- Next.js 15 (App Router) + React 19
+- [Kokonut UI](https://kokonutui.com/)–style components (`components/kokonutui/`) + shadcn/ui, Tailwind CSS
 - axios, Server Actions (API key stays server-side)
+
+### Design
+
+- **Logo & favicon**: explorer illustration at `public/logo.png` (also used as `app/icon.png`).
+- **Jungle theme**: emerald / forest greens and warm accents in `app/globals.css` (light + dark).
+- **Kokonut UI**: shimmer text and command button patterns inspired by [Kokonut UI](https://kokonutui.com/) (MIT). The shadcn registry can add more with `npx shadcn@latest add @kokonutui/<name>` when it doesn’t conflict with existing files.
 
 ## Getting started
 
@@ -56,7 +63,23 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:4000](http://localhost:4000).
+
+### Requirements
+
+- **Node.js 18.18+** (Node 20+ recommended for Next.js 15).
+
+### If the dev server or build acts strangely
+
+```bash
+rm -rf .next node_modules
+npm install
+npm run dev
+```
+
+Keep **`app/page.tsx`** as a **Server Component** (no `"use client"`, no `async` default export). Interactive UI lives in client components under `components/`.
+
+The **“Download the React DevTools…”** line in the console is a normal dev hint, not an error.
 
 ## Email and enrichment
 

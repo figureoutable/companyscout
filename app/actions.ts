@@ -1,6 +1,7 @@
 "use server";
 
 import { createCompaniesHouseClient } from "@/lib/companiesHouse";
+import { buildDerivedRowFields } from "@/lib/rowDerivatives";
 import type { CHCompanySearchItem, CompanyDirectorRow, SearchFilters } from "@/types";
 
 const progressStore = new Map<
@@ -162,6 +163,7 @@ export async function searchCompaniesWithDirectors(
       const regAddress = ch.formatAddress(company.registered_office_address);
       const sicStr = (company.sic_codes ?? []).join("; ");
       const incorporationDate = company.date_of_creation ?? "";
+      const locality = company.registered_office_address?.locality;
 
       if (directors.length === 0) {
         allRows.push({
@@ -176,6 +178,11 @@ export async function searchCompaniesWithDirectors(
           director_occupation: "",
           director_address: "",
           company_house_url: `https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`,
+          ...buildDerivedRowFields({
+            company_name: company.company_name ?? "",
+            director_name: "",
+            address_locality: locality,
+          }),
         });
       } else {
         for (const d of directors) {
@@ -195,6 +202,11 @@ export async function searchCompaniesWithDirectors(
             director_occupation: d.occupation ?? "",
             director_address: ch.formatAddress(d.address),
             company_house_url: `https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`,
+            ...buildDerivedRowFields({
+              company_name: company.company_name ?? "",
+              director_name: d.name ?? "",
+              address_locality: locality,
+            }),
           });
         }
       }

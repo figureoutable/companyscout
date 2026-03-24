@@ -3,6 +3,7 @@ import type {
   CHAddress,
   CHAdvancedSearchResponse,
   CHCompanySearchItem,
+  CHCompanyProfile,
   CHOfficerItem,
   CHOfficersResponse,
 } from "@/types";
@@ -29,6 +30,57 @@ function formatAddress(addr: { address_line_1?: string; address_line_2?: string;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Parse accounts overdue / next due from GET /company/{number} JSON. */
+function parseAccountsFromProfile(d: Record<string, unknown>): {
+  overdue: boolean | null;
+  next_due_on: string;
+} {
+  const accounts = d.accounts ?? d.Accounts;
+  if (!accounts || typeof accounts !== "object") {
+    return { overdue: null, next_due_on: "" };
+  }
+  const a = accounts as Record<string, unknown>;
+  const nextAccounts = a.next_accounts ?? a.nextAccounts;
+  if (nextAccounts && typeof nextAccounts === "object") {
+    const na = nextAccounts as Record<string, unknown>;
+    const dueRaw = na.due_on ?? na.dueOn;
+    const due = typeof dueRaw === "string" ? dueRaw : "";
+    const ov = na.overdue ?? na.Overdue;
+    if (typeof ov === "boolean") {
+      return { overdue: ov, next_due_on: due };
+    }
+  }
+  const top = a.overdue ?? a.Overdue;
+  if (typeof top === "boolean") {
+    const nextDue = a.next_due ?? a.nextDue;
+    const dueStr = typeof nextDue === "string" ? nextDue : "";
+    return { overdue: top, next_due_on: dueStr };
+  }
+  return { overdue: null, next_due_on: "" };
+}
+
+/** Parse confirmation statement overdue / next due from GET /company/{number} JSON. */
+function parseConfirmationStatementFromProfile(d: Record<string, unknown>): {
+  overdue: boolean | null;
+  next_due_on: string;
+} {
+  const cs = d.confirmation_statement ?? d.confirmationStatement;
+  if (!cs || typeof cs !== "object") {
+    return { overdue: null, next_due_on: "" };
+  }
+  const c = cs as Record<string, unknown>;
+  const ov = c.overdue ?? c.Overdue;
+  const nextDue = c.next_due ?? c.nextDue;
+  const dueStr = typeof nextDue === "string" ? nextDue : "";
+  if (typeof ov === "boolean") {
+    return { overdue: ov, next_due_on: dueStr };
+  }
+  if (dueStr) {
+    return { overdue: null, next_due_on: dueStr };
+  }
+  return { overdue: null, next_due_on: "" };
 }
 
 export function createCompaniesHouseClient(apiKey: string, officerDelayMs: number = DEFAULT_OFFICER_DELAY_MS) {
@@ -91,6 +143,45 @@ export function createCompaniesHouseClient(apiKey: string, officerDelayMs: numbe
     };
   }
 
+  async function getCompanyProfile(companyNumber: string): Promise<CHCompanyProfile | null> {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const { data } = await requestWithBackoff(() =>
+          client.get<Record<string, unknown>>(`/company/${encodeURIComponent(companyNumber)}`)
+        );
+        const d = data;
+        const { overdue, next_due_on } = parseAccountsFromProfile(d);
+        const confirm = parseConfirmationStatementFromProfile(d);
+        return {
+          company_number: (d.company_number ?? d.companyNumber ?? companyNumber) as string,
+          company_name: (d.company_name ?? d.companyName ?? "") as string,
+          company_status: (d.company_status ?? d.companyStatus) as string | undefined,
+          date_of_creation: (d.date_of_creation ?? d.dateOfCreation) as string | undefined,
+          sic_codes: (d.sic_codes ?? d.sicCodes) as string[] | undefined,
+          registered_office_address: (d.registered_office_address ?? d.registeredOfficeAddress) as
+            | CHAddress
+            | undefined,
+          accounts_overdue: overdue,
+          accounts_next_due_on: next_due_on || undefined,
+          confirmation_statement_overdue: confirm.overdue,
+          confirmation_statement_next_due_on: confirm.next_due_on || undefined,
+        };
+      } catch (err) {
+        const status = (err as AxiosError)?.response?.status;
+        if (status === 404) return null;
+        if ((status === 500 || status === 502) && attempt < 3) {
+          const wait = 2500 * (attempt + 1);
+          console.warn(`[CH] profile ${companyNumber} ${status}, retry in ${wait}ms`);
+          await sleep(wait);
+          continue;
+        }
+        console.error(`Company profile fetch failed for ${companyNumber}:`, (err as Error).message);
+        return null;
+      }
+    }
+    return null;
+  }
+
   async function getOfficers(companyNumber: string): Promise<CHOfficersResponse | null> {
     try {
       // One main attempt; if we get a 429, wait briefly and retry once.
@@ -104,17 +195,29 @@ export function createCompaniesHouseClient(apiKey: string, officerDelayMs: numbe
       };
 
       let resp;
-      try {
-        resp = await fetchOnce();
-      } catch (err) {
-        const status = (err as AxiosError)?.response?.status;
-        if (status === 429) {
-          // Back off a bit, then try once more.
-          await sleep(2000);
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
           resp = await fetchOnce();
-        } else {
-          throw err;
+          lastErr = undefined;
+          break;
+        } catch (err) {
+          lastErr = err;
+          const status = (err as AxiosError)?.response?.status;
+          if (status === 429 || status === 500 || status === 502) {
+            const wait = status === 429 ? 2000 : 3000 * (attempt + 1);
+            if (attempt < 3) {
+              console.warn(`[CH] officers ${companyNumber} ${status}, retry in ${wait}ms`);
+              await sleep(wait);
+              continue;
+            }
+          }
+          break;
         }
+      }
+      if (!resp) {
+        console.error(`Officer fetch failed for company ${companyNumber}:`, (lastErr as Error)?.message);
+        return null;
       }
 
       const data = resp!.data as Record<string, unknown>;
@@ -147,6 +250,7 @@ export function createCompaniesHouseClient(apiKey: string, officerDelayMs: numbe
   return {
     client,
     advancedSearch,
+    getCompanyProfile,
     getOfficers,
     formatAddress,
     ITEMS_PER_PAGE,

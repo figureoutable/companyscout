@@ -6,7 +6,16 @@ const CSV_HEADERS = [
   "incorporation_date",
   "sic_codes",
   "registered_address",
+  "accounts_overdue",
+  "accounts_next_due_on",
+  "confirmation_overdue",
+  "confirmation_next_due_on",
   "director_name",
+  "director_name_first_first",
+  "company_name_clean",
+  "company_name_clean_with_city",
+  "company_clean_and_director",
+  "director_and_company_clean",
   "director_dob_month_year",
   "director_nationality",
   "director_occupation",
@@ -20,12 +29,15 @@ function escapeCsvField(value: string): string {
   return value;
 }
 
+/** UTF-8 BOM so Excel on Windows opens the file as UTF-8 instead of misreading multibyte characters. */
+const UTF8_BOM = "\uFEFF";
+
 export function buildCsvContent(rows: CompanyDirectorRow[]): string {
   const headerLine = CSV_HEADERS.join(",");
   const dataLines = rows.map((row) =>
     CSV_HEADERS.map((h) => escapeCsvField(String(row[h] ?? ""))).join(",")
   );
-  return [headerLine, ...dataLines].join("\n");
+  return UTF8_BOM + [headerLine, ...dataLines].join("\n");
 }
 
 export function getCsvFilename(): string {

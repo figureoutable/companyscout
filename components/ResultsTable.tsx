@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ExportButton } from "@/components/ExportButton";
 import type { CompanyDirectorRow } from "@/types";
+import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 
 export interface ResultsTableProps {
@@ -21,6 +22,30 @@ export interface ResultsTableProps {
   onSelectionChange: (indices: Set<number>) => void;
   loading?: boolean;
   emptyMessage?: string;
+  /** When true (Enrich tab): accounts/confirmation overdue + derived name/company columns. */
+  showAccountsColumns?: boolean;
+  /** When true, no outer card frame — use inside a parent panel (e.g. with progress above). */
+  embedded?: boolean;
+  /** When true with embedded, grow to fill the panel (e.g. match sidebar height on search layout). */
+  fillHeight?: boolean;
+}
+
+function OverdueBadgeCell({ value }: { value: string | undefined }) {
+  if (value === "Yes") {
+    return (
+      <Badge variant="destructive" className="text-xs">
+        Yes
+      </Badge>
+    );
+  }
+  if (value === "No") {
+    return (
+      <Badge variant="secondary" className="text-xs">
+        No
+      </Badge>
+    );
+  }
+  return <span className="text-muted-foreground text-sm">Unknown</span>;
 }
 
 export function ResultsTable({
@@ -29,6 +54,9 @@ export function ResultsTable({
   onSelectionChange,
   loading,
   emptyMessage = "No results. Try adjusting your filters.",
+  showAccountsColumns = false,
+  embedded = false,
+  fillHeight = false,
 }: ResultsTableProps) {
   const toggleOne = (index: number) => {
     const next = new Set(selectedIndices);
@@ -44,28 +72,45 @@ export function ResultsTable({
 
   if (loading) {
     return (
-      <div className="rounded-lg border bg-card p-4">
-        <div className="space-y-3">
-          <div className="h-8 bg-muted animate-pulse rounded" />
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-14 bg-muted/60 animate-pulse rounded" />
-          ))}
-        </div>
+      <div
+        className={cn(
+          "space-y-3",
+          embedded ? "py-1" : "rounded-lg border bg-card p-4",
+          embedded && fillHeight && "flex min-h-0 flex-1 flex-col"
+        )}
+      >
+        <div className="h-8 shrink-0 bg-muted animate-pulse rounded" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-14 bg-muted/60 animate-pulse rounded" />
+        ))}
+        {embedded && fillHeight && <div className="min-h-0 flex-1" aria-hidden />}
       </div>
     );
   }
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-12 text-center text-muted-foreground">
-        <p>{emptyMessage}</p>
+      <div
+        className={cn(
+          "text-center text-muted-foreground",
+          embedded ? "text-sm" : "rounded-lg border bg-card p-12",
+          embedded && !fillHeight && "py-14 sm:py-16",
+          embedded && fillHeight && "flex min-h-0 flex-1 flex-col items-center justify-center py-8"
+        )}
+      >
+        <p className="max-w-sm">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div
+      className={cn(
+        "space-y-4",
+        embedded && fillHeight && "flex min-h-0 flex-1 flex-col"
+      )}
+    >
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <ExportButton
           rows={rows}
           selectedIndices={selectedIndices}
@@ -74,7 +119,12 @@ export function ResultsTable({
         />
         <ExportButton rows={rows} selectedIndices={selectedIndices} variant="all" />
       </div>
-      <div className="rounded-lg border overflow-hidden">
+      <div
+        className={cn(
+          "overflow-x-auto rounded-lg border",
+          embedded && fillHeight && "min-h-0 flex-1 overflow-auto"
+        )}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -90,7 +140,24 @@ export function ResultsTable({
               <TableHead>Incorporation date</TableHead>
               <TableHead>SIC codes</TableHead>
               <TableHead>Registered address</TableHead>
+              {showAccountsColumns && (
+                <>
+                  <TableHead>Accounts overdue</TableHead>
+                  <TableHead>Accounts due on</TableHead>
+                  <TableHead>Confirmation overdue</TableHead>
+                  <TableHead>Confirmation due on</TableHead>
+                </>
+              )}
               <TableHead>Director name(s)</TableHead>
+              {showAccountsColumns && (
+                <>
+                  <TableHead>Director (first first)</TableHead>
+                  <TableHead>Company (no Ltd)</TableHead>
+                  <TableHead>Company + city</TableHead>
+                  <TableHead>Company + director</TableHead>
+                  <TableHead>Director + company</TableHead>
+                </>
+              )}
               <TableHead>Director occupation</TableHead>
               <TableHead>Director nationality</TableHead>
             </TableRow>
@@ -132,7 +199,42 @@ export function ResultsTable({
                 <TableCell className="max-w-[200px] truncate" title={row.registered_address}>
                   {row.registered_address || "—"}
                 </TableCell>
+                {showAccountsColumns && (
+                  <>
+                    <TableCell>
+                      <OverdueBadgeCell value={row.accounts_overdue} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {row.accounts_next_due_on || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <OverdueBadgeCell value={row.confirmation_overdue} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {row.confirmation_next_due_on || "—"}
+                    </TableCell>
+                  </>
+                )}
                 <TableCell>{row.director_name || "—"}</TableCell>
+                {showAccountsColumns && (
+                  <>
+                    <TableCell className="max-w-[160px] text-sm whitespace-normal">
+                      {row.director_name_first_first || "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[140px] truncate text-sm" title={row.company_name_clean}>
+                      {row.company_name_clean || "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[180px] truncate text-sm" title={row.company_name_clean_with_city}>
+                      {row.company_name_clean_with_city || "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[220px] truncate text-sm" title={row.company_clean_and_director}>
+                      {row.company_clean_and_director || "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[220px] truncate text-sm" title={row.director_and_company_clean}>
+                      {row.director_and_company_clean || "—"}
+                    </TableCell>
+                  </>
+                )}
                 <TableCell>{row.director_occupation || "—"}</TableCell>
                 <TableCell>{row.director_nationality || "—"}</TableCell>
               </TableRow>

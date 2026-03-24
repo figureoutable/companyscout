@@ -13,6 +13,7 @@ import { resolve } from "path";
 import { mkdir, writeFile } from "fs/promises";
 import { createCompaniesHouseClient } from "../lib/companiesHouse";
 import { buildCsvContent } from "../lib/csvExport";
+import { buildDerivedRowFields } from "../lib/rowDerivatives";
 import type { CHCompanySearchItem, CompanyDirectorRow } from "../types";
 
 config({ path: resolve(process.cwd(), ".env.local") });
@@ -111,6 +112,7 @@ async function main() {
     const sicStr = (company.sic_codes ?? []).join("; ");
     const incorporationDate = company.date_of_creation ?? "";
     const url = `https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`;
+    const locality = company.registered_office_address?.locality;
 
     if (directors.length === 0) {
       allRows.push({
@@ -125,6 +127,11 @@ async function main() {
         director_occupation: "",
         director_address: "",
         company_house_url: url,
+        ...buildDerivedRowFields({
+          company_name: company.company_name ?? "",
+          director_name: "",
+          address_locality: locality,
+        }),
       });
     } else {
       for (const d of directors) {
@@ -144,6 +151,11 @@ async function main() {
           director_occupation: d.occupation ?? "",
           director_address: ch.formatAddress(d.address),
           company_house_url: url,
+          ...buildDerivedRowFields({
+            company_name: company.company_name ?? "",
+            director_name: d.name ?? "",
+            address_locality: locality,
+          }),
         });
       }
     }

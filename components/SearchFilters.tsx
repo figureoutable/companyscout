@@ -61,14 +61,15 @@ export function SearchFilters({
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Search className="size-4" />
+    <Card className="w-full border-border/80 shadow-sm dark:border-border/50">
+      <CardHeader className="space-y-1 pb-4">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold tracking-tight">
+          <Search className="size-4 shrink-0 text-muted-foreground" />
           Filters
         </CardTitle>
+        <p className="text-xs text-muted-foreground">Search Companies House by recency and filters.</p>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-5 pt-0">
         <div className="space-y-2">
           <Label htmlFor="recent-count">Most recent results</Label>
           <p className="text-xs text-muted-foreground">

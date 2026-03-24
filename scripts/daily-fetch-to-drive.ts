@@ -16,6 +16,7 @@ import { mkdir, writeFile } from "fs/promises";
 import axios from "axios";
 import { createCompaniesHouseClient } from "../lib/companiesHouse";
 import { buildCsvContent } from "../lib/csvExport";
+import { buildDerivedRowFields } from "../lib/rowDerivatives";
 import type { CompanyDirectorRow } from "../types";
 
 // Load .env.local from project root
@@ -107,6 +108,7 @@ async function fetchPreviousDayRows(): Promise<CompanyDirectorRow[]> {
       const sicStr = (company.sic_codes ?? []).join("; ");
       const incorporationDate = company.date_of_creation ?? "";
       const companyHouseUrl = `https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`;
+      const locality = company.registered_office_address?.locality;
 
       if (directors.length === 0) {
         allRows.push({
@@ -121,6 +123,11 @@ async function fetchPreviousDayRows(): Promise<CompanyDirectorRow[]> {
           director_occupation: "",
           director_address: "",
           company_house_url: companyHouseUrl,
+          ...buildDerivedRowFields({
+            company_name: company.company_name ?? "",
+            director_name: "",
+            address_locality: locality,
+          }),
         });
       } else {
         for (const d of directors) {
@@ -140,6 +147,11 @@ async function fetchPreviousDayRows(): Promise<CompanyDirectorRow[]> {
             director_occupation: d.occupation ?? "",
             director_address: ch.formatAddress(d.address),
             company_house_url: companyHouseUrl,
+            ...buildDerivedRowFields({
+              company_name: company.company_name ?? "",
+              director_name: d.name ?? "",
+              address_locality: locality,
+            }),
           });
         }
       }

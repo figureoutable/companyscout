@@ -9,14 +9,17 @@ export interface ProgressBarProps {
   current: number;
   total: number;
   className?: string;
+  /** If set, replaces the default phase label (e.g. file enrichment). */
+  description?: string;
 }
 
-export function ProgressBar({ phase, current, total, className }: ProgressBarProps) {
+export function ProgressBar({ phase, current, total, className, description }: ProgressBarProps) {
   const value = total > 0 ? Math.round((current / total) * 100) : 0;
   const label =
-    phase === "companies"
+    description ??
+    (phase === "companies"
       ? "Fetching companies…"
-      : `Fetching directors: ${current} of ${total} companies`;
+      : `Fetching directors: ${current} of ${total} companies`);
 
   return (
     <div className={cn("space-y-2", className)}>
