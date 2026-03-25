@@ -30,7 +30,7 @@ const parsedEnrichChunk = Number(process.env.NEXT_PUBLIC_ENRICH_CHUNK_SIZE);
 const ENRICH_CHUNK_SIZE =
   Number.isFinite(parsedEnrichChunk) && parsedEnrichChunk > 0
     ? Math.floor(parsedEnrichChunk)
-    : 12;
+    : 6;
 
 type MainTab = "search" | "enrich";
 
@@ -142,7 +142,7 @@ export default function HomeClient() {
       setEnrichBusy(false);
       const hint =
         /unexpected response/i.test(msg) || /failed to fetch/i.test(msg)
-          ? " Long runs often hit Vercel’s server time limit; we split large lists into smaller server requests—if this persists, lower NEXT_PUBLIC_ENRICH_CHUNK_SIZE (e.g. 8) in Vercel env."
+          ? ` Long runs often hit Vercel’s server time limit; we split the list into server requests (current chunk size: ${ENRICH_CHUNK_SIZE}). If this persists, lower NEXT_PUBLIC_ENRICH_CHUNK_SIZE in Vercel env (e.g. 4, 3, 2).`
           : "";
       setInlineError(`Enrichment failed: ${msg}${hint}`);
       toast.error(`Enrichment failed: ${msg}`);

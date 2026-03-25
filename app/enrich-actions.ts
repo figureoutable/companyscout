@@ -79,7 +79,8 @@ export async function enrichCompanyNumbers(
   const toProcess = unique.slice(0, max);
   const truncated = unique.length > max;
 
-  const delayMs = Number(process.env.OFFICER_FETCH_DELAY_MS) || 200;
+  // Default delay tuned for typical serverless limits; keep configurable via OFFICER_FETCH_DELAY_MS.
+  const delayMs = Number(process.env.OFFICER_FETCH_DELAY_MS) || 150;
   const ch = createCompaniesHouseClient(apiKey, delayMs);
   const allRows: CompanyDirectorRow[] = [];
   const failed: string[] = [];
