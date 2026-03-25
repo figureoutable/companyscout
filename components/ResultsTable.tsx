@@ -154,7 +154,6 @@ export function ResultsTable({
                   <TableHead>Director (first first)</TableHead>
                   <TableHead>Company (no Ltd)</TableHead>
                   <TableHead>Company + city</TableHead>
-                  <TableHead>Director + company</TableHead>
                   <TableHead>Director + company (LinkedIn)</TableHead>
                 </>
               )}
@@ -226,9 +225,6 @@ export function ResultsTable({
                     </TableCell>
                     <TableCell className="max-w-[180px] truncate text-sm" title={row.company_name_clean_with_city}>
                       {row.company_name_clean_with_city || "—"}
-                    </TableCell>
-                    <TableCell className="max-w-[220px] truncate text-sm" title={row.director_and_company_clean}>
-                      {row.director_and_company_clean || "—"}
                     </TableCell>
                     <TableCell className="max-w-[260px] truncate text-sm" title={row.director_company_linkedin}>
                       {row.director_company_linkedin || "—"}
