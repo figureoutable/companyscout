@@ -90,8 +90,6 @@ export interface CompanyDirectorRow {
   company_name_clean?: string;
   /** Clean company name + registered office locality (town/city). */
   company_name_clean_with_city?: string;
-  /** Clean company name + director (first name first). */
-  company_clean_and_director?: string;
   /** Director (first name first) + clean company name. */
   director_and_company_clean?: string;
   /** Director first-first + ", " + clean company name + " linkedin" (useful for LinkedIn search/copy-paste). */

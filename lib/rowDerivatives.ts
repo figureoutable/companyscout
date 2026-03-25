@@ -36,7 +36,6 @@ export type DerivedRowFields = Pick<
   | "director_name_first_first"
   | "company_name_clean"
   | "company_name_clean_with_city"
-  | "company_clean_and_director"
   | "director_and_company_clean"
   | "director_company_linkedin"
 >;
@@ -53,7 +52,6 @@ export function buildDerivedRowFields(params: {
 
   // ASCII " - " only (no commas) — avoids CSV/Excel confusion and UTF-8 mojibake from smart punctuation.
   const company_name_clean_with_city = city ? `${clean} - ${city}` : clean;
-  const company_clean_and_director = d ? `${clean} - ${d}` : clean;
   const director_and_company_clean = d ? `${d} - ${clean}` : clean;
   const director_company_linkedin =
     d && clean ? `${d}, ${clean} linkedin` : d ? `${d}, linkedin` : clean ? `${clean} linkedin` : "";
@@ -62,7 +60,6 @@ export function buildDerivedRowFields(params: {
     director_name_first_first: d,
     company_name_clean: clean,
     company_name_clean_with_city,
-    company_clean_and_director,
     director_and_company_clean,
     director_company_linkedin,
   };
