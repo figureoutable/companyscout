@@ -16,6 +16,18 @@ export function formatDirectorNameFirstFirst(chName: string): string {
   return `${rest} ${last}`.replace(/\s+/g, " ").trim();
 }
 
+/**
+ * From a "forename-first" director string (e.g. "Alexander Gerald FLANAGAN-WRIGHT"),
+ * keep only first and last tokens for short LinkedIn-style phrases.
+ */
+function formatDirectorFirstLastOnly(forenameFirst: string): string {
+  const t = forenameFirst.trim();
+  if (!t) return "";
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length <= 2) return parts.join(" ");
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
 /** Strip trailing Limited / Ltd / Ltd. (case-insensitive). */
 export function cleanCompanyName(name: string): string {
   let s = name.trim();
@@ -53,8 +65,15 @@ export function buildDerivedRowFields(params: {
   // ASCII " - " only (no commas) — avoids CSV/Excel confusion and UTF-8 mojibake from smart punctuation.
   const company_name_clean_with_city = city ? `${clean} - ${city}` : clean;
   const director_and_company_clean = d ? `${d} - ${clean}` : clean;
+  const dLinkedin = formatDirectorFirstLastOnly(d);
   const director_company_linkedin =
-    d && clean ? `${d}, ${clean} linkedin` : d ? `${d}, linkedin` : clean ? `${clean} linkedin` : "";
+    dLinkedin && clean
+      ? `${dLinkedin}, ${clean} linkedin`
+      : dLinkedin
+        ? `${dLinkedin}, linkedin`
+        : clean
+          ? `${clean} linkedin`
+          : "";
 
   return {
     director_name_first_first: d,
