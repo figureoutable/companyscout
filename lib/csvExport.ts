@@ -16,6 +16,7 @@ const CSV_HEADERS = [
   "company_name_clean_with_city",
   "company_clean_and_director",
   "director_and_company_clean",
+  "director_company_linkedin",
   "director_dob_month_year",
   "director_nationality",
   "director_occupation",

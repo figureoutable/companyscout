@@ -38,6 +38,7 @@ export type DerivedRowFields = Pick<
   | "company_name_clean_with_city"
   | "company_clean_and_director"
   | "director_and_company_clean"
+  | "director_company_linkedin"
 >;
 
 /** City/town from registered office `locality` when available. */
@@ -54,6 +55,8 @@ export function buildDerivedRowFields(params: {
   const company_name_clean_with_city = city ? `${clean} - ${city}` : clean;
   const company_clean_and_director = d ? `${clean} - ${d}` : clean;
   const director_and_company_clean = d ? `${d} - ${clean}` : clean;
+  const director_company_linkedin =
+    d && clean ? `${d}, ${clean} linkedin` : d ? `${d}, linkedin` : clean ? `${clean} linkedin` : "";
 
   return {
     director_name_first_first: d,
@@ -61,5 +64,6 @@ export function buildDerivedRowFields(params: {
     company_name_clean_with_city,
     company_clean_and_director,
     director_and_company_clean,
+    director_company_linkedin,
   };
 }

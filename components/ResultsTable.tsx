@@ -156,6 +156,7 @@ export function ResultsTable({
                   <TableHead>Company + city</TableHead>
                   <TableHead>Company + director</TableHead>
                   <TableHead>Director + company</TableHead>
+                  <TableHead>Director + company (LinkedIn)</TableHead>
                 </>
               )}
               <TableHead>Director occupation</TableHead>
@@ -232,6 +233,9 @@ export function ResultsTable({
                     </TableCell>
                     <TableCell className="max-w-[220px] truncate text-sm" title={row.director_and_company_clean}>
                       {row.director_and_company_clean || "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[260px] truncate text-sm" title={row.director_company_linkedin}>
+                      {row.director_company_linkedin || "—"}
                     </TableCell>
                   </>
                 )}
