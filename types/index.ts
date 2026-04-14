@@ -45,6 +45,45 @@ export interface CHOfficersResponse {
   items: CHOfficerItem[];
 }
 
+export interface CHOfficerSearchItem {
+  title: string;
+  name?: string;
+  kind?: string;
+  officer_role?: string;
+  date_of_birth?: {
+    month?: number;
+    year?: number;
+  };
+  links?: {
+    self?: string;
+    officer?: {
+      appointments?: string;
+    };
+  };
+}
+
+export interface CHOfficerSearchResponse {
+  items: CHOfficerSearchItem[];
+  total_results: number;
+}
+
+export interface CHOfficerAppointmentItem {
+  name?: string;
+  officer_role?: string;
+  appointed_on?: string;
+  resigned_on?: string;
+  appointed_to?: {
+    company_number?: string;
+    company_name?: string;
+    company_status?: string;
+  };
+}
+
+export interface CHOfficerAppointmentsResponse {
+  items: CHOfficerAppointmentItem[];
+  total_results: number;
+}
+
 /** GET /company/{number} profile (subset we use for enrichment). */
 export interface CHCompanyProfile {
   company_number: string;

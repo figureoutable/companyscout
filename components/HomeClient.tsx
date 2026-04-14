@@ -4,14 +4,19 @@ import { useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { SearchFilters } from "@/components/SearchFilters";
 import { FileEnrichPanel } from "@/components/FileEnrichPanel";
+import { DirectorSearchPanel } from "@/components/DirectorSearchPanel";
 import { ResultsTable } from "@/components/ResultsTable";
 import { ProgressBar } from "@/components/ProgressBar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, Search, FileSpreadsheet } from "lucide-react";
+import { Moon, Sun, Search, FileSpreadsheet, UserSearch } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { searchCompaniesWithDirectors, getSearchProgress } from "@/app/actions";
+import {
+  searchCompaniesWithDirectors,
+  searchCompaniesByDirectorName,
+  getSearchProgress,
+} from "@/app/actions";
 import { enrichCompanyNumbers, getEnrichProgress } from "@/app/enrich-actions";
 import type { SearchFilters as SearchFiltersType, CompanyDirectorRow } from "@/types";
 import { cn } from "@/lib/utils";
@@ -32,7 +37,7 @@ const ENRICH_CHUNK_SIZE =
     ? Math.floor(parsedEnrichChunk)
     : 6;
 
-type MainTab = "search" | "enrich";
+type MainTab = "search" | "enrich" | "director";
 
 export default function HomeClient() {
   const [mainTab, setMainTab] = useState<MainTab>("search");
@@ -45,7 +50,9 @@ export default function HomeClient() {
   const [searchBusy, setSearchBusy] = useState(false);
   /** Enrich tab only — do not block Search while enriching. */
   const [enrichBusy, setEnrichBusy] = useState(false);
-  const tabBusy = mainTab === "search" ? searchBusy : enrichBusy;
+  /** Director tab only — do not block Search/Enrich while searching by director. */
+  const [directorBusy, setDirectorBusy] = useState(false);
+  const tabBusy = mainTab === "search" ? searchBusy : mainTab === "enrich" ? enrichBusy : directorBusy;
   const [progress, setProgress] = useState<{
     phase: "companies" | "directors";
     current: number;
@@ -217,6 +224,50 @@ export default function HomeClient() {
     }
   }, []);
 
+  const runDirectorSearch = useCallback(async (directorName: string) => {
+    const sessionId = `director-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionIdRef.current = sessionId;
+    setDirectorBusy(true);
+    setProgress({ phase: "companies", current: 0, total: 1, description: "Searching officer…" });
+    setRows([]);
+    setResultMessage(null);
+    setInlineError(null);
+    setSelectedIndices(new Set());
+
+    pollRef.current = setInterval(() => {
+      void (async () => {
+        const p = await getSearchProgress(sessionId);
+        if (p) {
+          setProgress({
+            phase: p.phase as "companies" | "directors",
+            current: p.current,
+            total: p.total,
+            description: p.phase === "companies" ? "Searching officer…" : "Loading active appointments…",
+          });
+        }
+      })();
+    }, POLL_INTERVAL_MS);
+
+    const result = await searchCompaniesByDirectorName(directorName, sessionId);
+    stopPolling();
+    setDirectorBusy(false);
+
+    if (result.success) {
+      setRows(result.rows);
+      setTotalResults(result.totalResults);
+      setResultMessage(result.message ?? null);
+      setInlineError(null);
+      if (result.rows.length > 0) {
+        toast.success(`Found ${result.rows.length} active company appointment(s) for "${directorName.trim()}".`);
+      } else {
+        toast.warning(result.message ?? "No active company appointments found.");
+      }
+    } else {
+      setInlineError(result.error);
+      toast.error(result.error);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/85 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/70 dark:border-border/30 dark:bg-background/90 dark:supports-[backdrop-filter]:bg-background/75">
@@ -272,6 +323,20 @@ export default function HomeClient() {
                 <span className="hidden min-[480px]:inline">Enrich from file</span>
                 <span className="inline min-[480px]:hidden">Enrich</span>
               </Button>
+              <Button
+                type="button"
+                role="tab"
+                aria-label="Director search tab"
+                aria-selected={mainTab === "director"}
+                variant={mainTab === "director" ? "default" : "ghost"}
+                size="sm"
+                className={cn("gap-1.5 px-3", mainTab === "director" && "shadow-sm")}
+                onClick={() => setMainTab("director")}
+              >
+                <UserSearch className="size-4 shrink-0" />
+                <span className="hidden sm:inline">Director Search</span>
+                <span className="inline sm:hidden">Director</span>
+              </Button>
             </div>
           </div>
           <Button
@@ -298,7 +363,7 @@ export default function HomeClient() {
         >
           <aside
             className={cn(
-              mainTab === "search" && "lg:sticky lg:top-[4.5rem] lg:self-start"
+              (mainTab === "search" || mainTab === "director") && "lg:sticky lg:top-[4.5rem] lg:self-start"
             )}
           >
             {mainTab === "search" ? (
@@ -308,6 +373,8 @@ export default function HomeClient() {
                 onSearch={runSearch}
                 isSearching={searchBusy}
               />
+            ) : mainTab === "director" ? (
+              <DirectorSearchPanel onSearch={runDirectorSearch} isSearching={directorBusy} />
             ) : (
               <FileEnrichPanel onNumbersReady={runEnrich} disabled={enrichBusy} />
             )}
@@ -316,19 +383,19 @@ export default function HomeClient() {
           <div
             className={cn(
               "min-w-0 w-full",
-              mainTab === "search" && "lg:flex lg:h-full lg:min-h-0 lg:flex-col"
+              (mainTab === "search" || mainTab === "director") && "lg:flex lg:h-full lg:min-h-0 lg:flex-col"
             )}
           >
             <Card
               className={cn(
                 "gap-0 overflow-hidden border-border/80 p-0 shadow-sm dark:border-border/50",
-                mainTab === "search" && "lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col"
+                (mainTab === "search" || mainTab === "director") && "lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col"
               )}
             >
               <CardContent
                 className={cn(
                   "space-y-0 p-0",
-                  mainTab === "search" && "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+                  (mainTab === "search" || mainTab === "director") && "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
                 )}
               >
                 {progress && tabBusy && (
@@ -345,7 +412,7 @@ export default function HomeClient() {
                 <div
                   className={cn(
                     "space-y-5 p-4 sm:p-6",
-                    mainTab === "search" && "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+                    (mainTab === "search" || mainTab === "director") && "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
                   )}
                 >
                   {inlineError && (
@@ -368,7 +435,7 @@ export default function HomeClient() {
 
                   <ResultsTable
                     embedded
-                    fillHeight={mainTab === "search"}
+                    fillHeight={mainTab === "search" || mainTab === "director"}
                     rows={rows}
                     selectedIndices={selectedIndices}
                     onSelectionChange={setSelectedIndices}
@@ -377,6 +444,8 @@ export default function HomeClient() {
                     emptyMessage={
                       mainTab === "enrich"
                         ? "Upload a file with company numbers, then click Enrich."
+                        : mainTab === "director"
+                          ? "Search by exact director full name to load active company appointments."
                         : "No results. Try adjusting your filters."
                     }
                   />

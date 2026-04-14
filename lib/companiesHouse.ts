@@ -2,9 +2,13 @@ import axios, { AxiosInstance, AxiosError } from "axios";
 import type {
   CHAddress,
   CHAdvancedSearchResponse,
+  CHOfficerAppointmentsResponse,
+  CHOfficerAppointmentItem,
   CHCompanySearchItem,
   CHCompanyProfile,
   CHOfficerItem,
+  CHOfficerSearchItem,
+  CHOfficerSearchResponse,
   CHOfficersResponse,
 } from "@/types";
 
@@ -247,11 +251,65 @@ export function createCompaniesHouseClient(apiKey: string, officerDelayMs: numbe
     }
   }
 
+  async function searchOfficersByName(query: string): Promise<CHOfficerSearchResponse | null> {
+    try {
+      const { data } = await requestWithBackoff(() =>
+        client.get<Record<string, unknown>>("/search/officers", {
+          params: {
+            q: query,
+            items_per_page: 100,
+          },
+        })
+      );
+      const rawItems = (data.items ?? data.Items ?? []) as Record<string, unknown>[];
+      const items: CHOfficerSearchItem[] = rawItems.map((item) => ({
+        title: (item.title ?? item.name ?? "") as string,
+        name: (item.name ?? item.title ?? "") as string | undefined,
+        kind: item.kind as string | undefined,
+        officer_role: (item.officer_role ?? item.officerRole) as string | undefined,
+        date_of_birth: (item.date_of_birth ?? item.dateOfBirth) as
+          | { month?: number; year?: number }
+          | undefined,
+        links: item.links as CHOfficerSearchItem["links"],
+      }));
+      const totalResults = Number(data.total_results ?? data.totalResults ?? 0);
+      return { items, total_results: totalResults };
+    } catch (err) {
+      console.error(`Officer search failed for "${query}":`, (err as Error).message);
+      return null;
+    }
+  }
+
+  async function getOfficerAppointments(appointmentsPath: string): Promise<CHOfficerAppointmentsResponse | null> {
+    try {
+      const { data } = await requestWithBackoff(() =>
+        client.get<Record<string, unknown>>(appointmentsPath, {
+          params: { items_per_page: 100 },
+        })
+      );
+      const rawItems = (data.items ?? data.Items ?? []) as Record<string, unknown>[];
+      const items: CHOfficerAppointmentItem[] = rawItems.map((item) => ({
+        name: item.name as string | undefined,
+        officer_role: (item.officer_role ?? item.officerRole) as string | undefined,
+        appointed_on: (item.appointed_on ?? item.appointedOn) as string | undefined,
+        resigned_on: (item.resigned_on ?? item.resignedOn) as string | undefined,
+        appointed_to: (item.appointed_to ?? item.appointedTo) as CHOfficerAppointmentItem["appointed_to"],
+      }));
+      const totalResults = Number(data.total_results ?? data.totalResults ?? 0);
+      return { items, total_results: totalResults };
+    } catch (err) {
+      console.error(`Officer appointments fetch failed (${appointmentsPath}):`, (err as Error).message);
+      return null;
+    }
+  }
+
   return {
     client,
     advancedSearch,
     getCompanyProfile,
     getOfficers,
+    searchOfficersByName,
+    getOfficerAppointments,
     formatAddress,
     ITEMS_PER_PAGE,
     officerDelayMs,
