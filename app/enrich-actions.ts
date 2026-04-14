@@ -120,6 +120,7 @@ export async function enrichCompanyNumbers(
           allRows.push({
             company_number: profile.company_number,
             company_name: profile.company_name ?? "",
+            company_status: profile.company_status ?? "",
             incorporation_date: incorporationDate,
             sic_codes: sicStr,
             registered_address: regAddress,
@@ -145,6 +146,7 @@ export async function enrichCompanyNumbers(
             allRows.push({
               company_number: profile.company_number,
               company_name: profile.company_name ?? "",
+              company_status: profile.company_status ?? "",
               incorporation_date: incorporationDate,
               sic_codes: sicStr,
               registered_address: regAddress,

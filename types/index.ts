@@ -106,6 +106,7 @@ export interface CHCompanyProfile {
 export interface CompanyDirectorRow {
   company_number: string;
   company_name: string;
+  company_status?: string;
   incorporation_date: string;
   sic_codes: string;
   registered_address: string;

@@ -137,6 +137,7 @@ export function ResultsTable({
               </TableHead>
               <TableHead>Company name</TableHead>
               <TableHead>Company number</TableHead>
+              <TableHead>Company status</TableHead>
               <TableHead>Incorporation date</TableHead>
               <TableHead>SIC codes</TableHead>
               <TableHead>Registered address</TableHead>
@@ -183,6 +184,7 @@ export function ResultsTable({
                   </a>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{row.company_number}</TableCell>
+                <TableCell className="capitalize">{row.company_status || "—"}</TableCell>
                 <TableCell>{row.incorporation_date}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1 max-w-[140px]">

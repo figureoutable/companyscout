@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { SearchFilters } from "@/components/SearchFilters";
 import { FileEnrichPanel } from "@/components/FileEnrichPanel";
@@ -9,6 +9,7 @@ import { ResultsTable } from "@/components/ResultsTable";
 import { ProgressBar } from "@/components/ProgressBar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Moon, Sun, Search, FileSpreadsheet, UserSearch } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ const ENRICH_CHUNK_SIZE =
 type MainTab = "search" | "enrich" | "director";
 
 export default function HomeClient() {
+  type CompanyStatusFilter = "all" | "not-dissolved" | "dissolved";
   const [mainTab, setMainTab] = useState<MainTab>("search");
   const [filters, setFilters] = useState<SearchFiltersType>(DEFAULT_FILTERS);
   const [rows, setRows] = useState<CompanyDirectorRow[]>([]);
@@ -60,9 +62,22 @@ export default function HomeClient() {
     description?: string;
   } | null>(null);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [companyStatusFilter, setCompanyStatusFilter] = useState<CompanyStatusFilter>("all");
   const sessionIdRef = useRef<string>("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { theme, setTheme } = useTheme();
+
+  const filteredRows = useMemo(() => {
+    if (companyStatusFilter === "all") return rows;
+    if (companyStatusFilter === "dissolved") {
+      return rows.filter((row) => row.company_status?.toLowerCase() === "dissolved");
+    }
+    return rows.filter((row) => row.company_status?.toLowerCase() !== "dissolved");
+  }, [rows, companyStatusFilter]);
+
+  useEffect(() => {
+    setSelectedIndices(new Set());
+  }, [companyStatusFilter, rows]);
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -424,7 +439,8 @@ export default function HomeClient() {
                   {!tabBusy && rows.length > 0 && (
                     <div className="shrink-0 space-y-1 rounded-lg border border-border/60 bg-muted/20 px-4 py-3 dark:bg-muted/10">
                       <p className="text-sm text-muted-foreground">
-                        Total: <span className="font-medium text-foreground">{rows.length}</span> row(s) from{" "}
+                        Showing <span className="font-medium text-foreground">{filteredRows.length}</span> of{" "}
+                        <span className="font-medium text-foreground">{rows.length}</span> row(s) from{" "}
                         <span className="font-medium text-foreground">{totalResults}</span> companies
                       </p>
                       {resultMessage && (
@@ -433,14 +449,33 @@ export default function HomeClient() {
                     </div>
                   )}
 
+                  {!tabBusy && rows.length > 0 && (
+                    <div className="shrink-0 flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Company status</span>
+                      <Select
+                        value={companyStatusFilter}
+                        onValueChange={(value) => setCompanyStatusFilter(value as CompanyStatusFilter)}
+                      >
+                        <SelectTrigger className="h-9 w-[210px]">
+                          <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="not-dissolved">Not dissolved</SelectItem>
+                          <SelectItem value="dissolved">Dissolved</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <ResultsTable
                     embedded
                     fillHeight={mainTab === "search" || mainTab === "director"}
-                    rows={rows}
+                    rows={filteredRows}
                     selectedIndices={selectedIndices}
                     onSelectionChange={setSelectedIndices}
                     loading={tabBusy}
-                    showAccountsColumns={mainTab === "enrich"}
+                    showAccountsColumns={mainTab === "enrich" || mainTab === "director"}
                     emptyMessage={
                       mainTab === "enrich"
                         ? "Upload a file with company numbers, then click Enrich."

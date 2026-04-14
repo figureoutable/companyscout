@@ -60,6 +60,17 @@ function resolveAppointmentsPath(links: { self?: string; officer?: { appointment
   return null;
 }
 
+function accountsComplianceFields(profile: { accounts_overdue?: boolean | null; accounts_next_due_on?: string }): Pick<
+  CompanyDirectorRow,
+  "accounts_overdue" | "accounts_next_due_on"
+> {
+  const overdue = profile.accounts_overdue;
+  return {
+    accounts_overdue: overdue === true ? "Yes" : overdue === false ? "No" : "Unknown",
+    accounts_next_due_on: profile.accounts_next_due_on ?? "",
+  };
+}
+
 export async function getSearchProgress(sessionId: string): Promise<{
   current: number;
   total: number;
@@ -199,6 +210,7 @@ export async function searchCompaniesWithDirectors(
         allRows.push({
           company_number: company.company_number,
           company_name: company.company_name ?? "",
+          company_status: company.company_status ?? "",
           incorporation_date: incorporationDate,
           sic_codes: sicStr,
           registered_address: regAddress,
@@ -223,6 +235,7 @@ export async function searchCompaniesWithDirectors(
           allRows.push({
             company_number: company.company_number,
             company_name: company.company_name ?? "",
+            company_status: company.company_status ?? "",
             incorporation_date: incorporationDate,
             sic_codes: sicStr,
             registered_address: regAddress,
@@ -350,6 +363,7 @@ export async function searchCompaniesByDirectorName(
       rows.push({
         company_number: companyNumber,
         company_name: companyName,
+        company_status: profile?.company_status ?? appointment.appointed_to?.company_status ?? "",
         incorporation_date: incorporationDate,
         sic_codes: sicCodes,
         registered_address: regAddress,
@@ -359,6 +373,10 @@ export async function searchCompaniesByDirectorName(
         director_occupation: "",
         director_address: "",
         company_house_url: `https://find-and-update.company-information.service.gov.uk/company/${companyNumber}`,
+        ...accountsComplianceFields({
+          accounts_overdue: profile?.accounts_overdue ?? null,
+          accounts_next_due_on: profile?.accounts_next_due_on,
+        }),
         ...buildDerivedRowFields({
           company_name: companyName,
           director_name: input,
